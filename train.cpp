@@ -23,6 +23,11 @@ void model::train(string path)
 {
     string pw;
     ifstream train_set(path);
+    if (!train_set.is_open())
+    {
+        cerr << "Failed to open training set: " << path << endl;
+        return;
+    }
     int lines = 0;
     cout<<"Training..."<<endl;
     cout<<"Training phase 1: reading and parsing passwords..."<<endl;

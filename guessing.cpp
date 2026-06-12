@@ -93,7 +93,11 @@ void PriorityQueue::PopNext()
 {
 
     // 对优先队列最前面的PT，首先利用这个PT生成一系列猜测
+#ifdef USE_CPU_GENERATION
     Generate(priority.front());
+#else
+    GenerateGPU(priority.front());
+#endif
 
     // 然后需要根据即将出队的PT，生成一系列新的PT
     vector<PT> new_pts = priority.front().NewPTs();

@@ -5,4 +5,7 @@ files/
 *.log
 *.o
 *.exe
+*.exp
+*.lib
+*.pdb
 Rockyou-singleLined-full.txt

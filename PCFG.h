@@ -2,6 +2,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <queue>
+#include <vector>
 #include <omp.h>
 // #include <chrono>   
 // using namespace chrono;
@@ -154,6 +155,7 @@ public:
 
     // 对优先队列的一个PT，生成所有guesses
     void Generate(PT pt);
+    void GenerateGPU(PT pt);
 
     // 将优先队列最前面的一个PT
     void PopNext();
