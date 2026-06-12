@@ -3,15 +3,24 @@
 #include <cuda_runtime.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdlib>
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <vector>
 
 namespace {
 
+using Clock = std::chrono::steady_clock;
+
 constexpr int MAX_GUESS_LENGTH = 128;
 constexpr int THREADS_PER_BLOCK = 256;
+
+double SecondsBetween(Clock::time_point start, Clock::time_point end)
+{
+    return std::chrono::duration<double>(end - start).count();
+}
 
 void CheckCuda(cudaError_t result, const char *operation)
 {
@@ -79,8 +88,10 @@ __global__ void GenerateGuessesKernel(
 
 void PriorityQueue::GenerateGPU(PT pt)
 {
+    const auto total_start = Clock::now();
     CalProb(pt);
 
+    const auto pack_start = Clock::now();
     const std::string base = BuildBaseGuess(m, pt);
     segment *last_segment = FindSegment(m, pt.content.back());
     const int count = pt.max_indices.back();
@@ -115,6 +126,7 @@ void PriorityQueue::GenerateGPU(PT pt)
     const size_t results_size =
         static_cast<size_t>(count) * MAX_GUESS_LENGTH;
     std::vector<char> results(results_size);
+    const auto pack_end = Clock::now();
 
     char *device_base = nullptr;
     char *device_values = nullptr;
@@ -122,6 +134,7 @@ void PriorityQueue::GenerateGPU(PT pt)
     int *device_lengths = nullptr;
     char *device_results = nullptr;
 
+    const auto alloc_start = Clock::now();
     if (!base.empty())
     {
         CheckCuda(cudaMalloc(
@@ -143,7 +156,9 @@ void PriorityQueue::GenerateGPU(PT pt)
     CheckCuda(cudaMalloc(
                   reinterpret_cast<void **>(&device_results), results_size),
               "cudaMalloc(results)");
+    const auto alloc_end = Clock::now();
 
+    const auto h2d_start = Clock::now();
     if (!base.empty())
     {
         CheckCuda(cudaMemcpy(
@@ -171,8 +186,14 @@ void PriorityQueue::GenerateGPU(PT pt)
                   lengths.size() * sizeof(int),
                   cudaMemcpyHostToDevice),
               "cudaMemcpy(lengths)");
+    const auto h2d_end = Clock::now();
 
     const int blocks = (count + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    cudaEvent_t kernel_start;
+    cudaEvent_t kernel_end;
+    CheckCuda(cudaEventCreate(&kernel_start), "cudaEventCreate(kernel_start)");
+    CheckCuda(cudaEventCreate(&kernel_end), "cudaEventCreate(kernel_end)");
+    CheckCuda(cudaEventRecord(kernel_start), "cudaEventRecord(kernel_start)");
     GenerateGuessesKernel<<<blocks, THREADS_PER_BLOCK>>>(
         device_base,
         static_cast<int>(base.size()),
@@ -182,25 +203,74 @@ void PriorityQueue::GenerateGPU(PT pt)
         device_results,
         count);
     CheckCuda(cudaGetLastError(), "GenerateGuessesKernel launch");
-    CheckCuda(cudaDeviceSynchronize(), "GenerateGuessesKernel execution");
+    CheckCuda(cudaEventRecord(kernel_end), "cudaEventRecord(kernel_end)");
+    CheckCuda(cudaEventSynchronize(kernel_end), "GenerateGuessesKernel execution");
+    float kernel_milliseconds = 0.0f;
+    CheckCuda(
+        cudaEventElapsedTime(
+            &kernel_milliseconds, kernel_start, kernel_end),
+        "cudaEventElapsedTime(kernel)");
+    CheckCuda(cudaEventDestroy(kernel_start), "cudaEventDestroy(kernel_start)");
+    CheckCuda(cudaEventDestroy(kernel_end), "cudaEventDestroy(kernel_end)");
+
+    const auto d2h_start = Clock::now();
     CheckCuda(cudaMemcpy(
                   results.data(),
                   device_results,
                   results_size,
                   cudaMemcpyDeviceToHost),
               "cudaMemcpy(results)");
+    const auto d2h_end = Clock::now();
 
+    const auto free_start = Clock::now();
     CheckCuda(cudaFree(device_base), "cudaFree(base)");
     CheckCuda(cudaFree(device_values), "cudaFree(values)");
     CheckCuda(cudaFree(device_offsets), "cudaFree(offsets)");
     CheckCuda(cudaFree(device_lengths), "cudaFree(lengths)");
     CheckCuda(cudaFree(device_results), "cudaFree(results)");
+    const auto free_end = Clock::now();
 
+    const auto rebuild_start = Clock::now();
     guesses.reserve(guesses.size() + count);
     for (int i = 0; i < count; ++i)
     {
         guesses.emplace_back(
             results.data() + static_cast<size_t>(i) * MAX_GUESS_LENGTH);
     }
+    const auto rebuild_end = Clock::now();
     total_guesses += count;
+
+    ++gpu_calls;
+    gpu_generated_guesses += count;
+    gpu_pack_time += SecondsBetween(pack_start, pack_end);
+    gpu_alloc_time += SecondsBetween(alloc_start, alloc_end);
+    gpu_h2d_time += SecondsBetween(h2d_start, h2d_end);
+    gpu_kernel_time += kernel_milliseconds / 1000.0;
+    gpu_d2h_time += SecondsBetween(d2h_start, d2h_end);
+    gpu_free_time += SecondsBetween(free_start, free_end);
+    gpu_rebuild_time += SecondsBetween(rebuild_start, rebuild_end);
+    gpu_total_time += SecondsBetween(total_start, Clock::now());
+}
+
+void PriorityQueue::PrintGPUTimingSummary() const
+{
+    const double average_guesses =
+        gpu_calls == 0
+            ? 0.0
+            : static_cast<double>(gpu_generated_guesses) / gpu_calls;
+
+    std::cout << std::fixed << std::setprecision(6);
+    std::cout << "GPU timing summary:" << std::endl;
+    std::cout << "GPU calls: " << gpu_calls << std::endl;
+    std::cout << "GPU generated guesses: " << gpu_generated_guesses << std::endl;
+    std::cout << "Average guesses per GPU call: " << average_guesses << std::endl;
+    std::cout << "GPU pack time: " << gpu_pack_time << " seconds" << std::endl;
+    std::cout << "GPU allocation time: " << gpu_alloc_time << " seconds" << std::endl;
+    std::cout << "GPU H2D time: " << gpu_h2d_time << " seconds" << std::endl;
+    std::cout << "GPU kernel time: " << gpu_kernel_time << " seconds" << std::endl;
+    std::cout << "GPU D2H time: " << gpu_d2h_time << " seconds" << std::endl;
+    std::cout << "GPU rebuild time: " << gpu_rebuild_time << " seconds" << std::endl;
+    std::cout << "GPU free time: " << gpu_free_time << " seconds" << std::endl;
+    std::cout << "GPU total GenerateGPU time: " << gpu_total_time << " seconds"
+              << std::endl;
 }

@@ -113,4 +113,5 @@ int main()
             q.guesses.clear();
         }
     }
+    q.PrintGPUTimingSummary();
 }

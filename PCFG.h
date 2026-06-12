@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <queue>
 #include <vector>
+#include <cstdint>
 #include <omp.h>
 // #include <chrono>   
 // using namespace chrono;
@@ -156,9 +157,21 @@ public:
     // 对优先队列的一个PT，生成所有guesses
     void Generate(PT pt);
     void GenerateGPU(PT pt);
+    void PrintGPUTimingSummary() const;
 
     // 将优先队列最前面的一个PT
     void PopNext();
     int total_guesses = 0;
     vector<string> guesses;
+
+    uint64_t gpu_calls = 0;
+    uint64_t gpu_generated_guesses = 0;
+    double gpu_pack_time = 0.0;
+    double gpu_alloc_time = 0.0;
+    double gpu_h2d_time = 0.0;
+    double gpu_kernel_time = 0.0;
+    double gpu_d2h_time = 0.0;
+    double gpu_rebuild_time = 0.0;
+    double gpu_free_time = 0.0;
+    double gpu_total_time = 0.0;
 };
