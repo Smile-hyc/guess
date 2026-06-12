@@ -1,4 +1,5 @@
 #include "PCFG.h"
+#include <chrono>
 using namespace std;
 
 void PriorityQueue::CalProb(PT &pt)
@@ -96,7 +97,15 @@ void PriorityQueue::PopNext()
 #ifdef USE_CPU_GENERATION
     Generate(priority.front());
 #else
-    GenerateGPU(priority.front());
+    const int candidate_count = priority.front().max_indices.back();
+    if (candidate_count < GPU_THRESHOLD)
+    {
+        Generate(priority.front());
+    }
+    else
+    {
+        GenerateGPU(priority.front());
+    }
 #endif
 
     // 然后需要根据即将出队的PT，生成一系列新的PT
@@ -185,6 +194,9 @@ vector<PT> PT::NewPTs()
 // 尽量看懂，然后进行并行实现
 void PriorityQueue::Generate(PT pt)
 {
+    const auto generate_start = chrono::steady_clock::now();
+    const int generated_count = pt.max_indices.back();
+
     // 计算PT的概率，这里主要是给PT的概率进行初始化
     CalProb(pt);
 
@@ -274,4 +286,10 @@ void PriorityQueue::Generate(PT pt)
             total_guesses += 1;
         }
     }
+
+    cpu_calls += 1;
+    cpu_generated_guesses += generated_count;
+    cpu_generate_time += chrono::duration<double>(
+                             chrono::steady_clock::now() - generate_start)
+                             .count();
 }

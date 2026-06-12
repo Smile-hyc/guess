@@ -114,4 +114,5 @@ int main()
         }
     }
     q.PrintGPUTimingSummary();
+    q.PrintDynamicSchedulingSummary();
 }

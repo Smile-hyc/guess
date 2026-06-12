@@ -274,3 +274,18 @@ void PriorityQueue::PrintGPUTimingSummary() const
     std::cout << "GPU total GenerateGPU time: " << gpu_total_time << " seconds"
               << std::endl;
 }
+
+void PriorityQueue::PrintDynamicSchedulingSummary() const
+{
+    std::cout << std::fixed << std::setprecision(6);
+    std::cout << "Dynamic scheduling summary:" << std::endl;
+    std::cout << "GPU_THRESHOLD: " << GPU_THRESHOLD << std::endl;
+    std::cout << "CPU Generate calls: " << cpu_calls << std::endl;
+    std::cout << "GPU Generate calls: " << gpu_calls << std::endl;
+    std::cout << "CPU generated guesses: " << cpu_generated_guesses << std::endl;
+    std::cout << "GPU generated guesses: " << gpu_generated_guesses << std::endl;
+    std::cout << "CPU Generate time: " << cpu_generate_time << " seconds"
+              << std::endl;
+    std::cout << "GPU Generate time: " << gpu_total_time << " seconds"
+              << std::endl;
+}

@@ -9,6 +9,10 @@
 // using namespace chrono;
 using namespace std;
 
+#ifndef GPU_THRESHOLD
+#define GPU_THRESHOLD 16384
+#endif
+
 class segment
 {
 public:
@@ -158,6 +162,7 @@ public:
     void Generate(PT pt);
     void GenerateGPU(PT pt);
     void PrintGPUTimingSummary() const;
+    void PrintDynamicSchedulingSummary() const;
 
     // 将优先队列最前面的一个PT
     void PopNext();
@@ -174,4 +179,8 @@ public:
     double gpu_rebuild_time = 0.0;
     double gpu_free_time = 0.0;
     double gpu_total_time = 0.0;
+
+    uint64_t cpu_calls = 0;
+    uint64_t cpu_generated_guesses = 0;
+    double cpu_generate_time = 0.0;
 };

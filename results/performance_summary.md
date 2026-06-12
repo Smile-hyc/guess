@@ -17,6 +17,9 @@
 | Serial baseline | 0.277775 | 2.18975 | 21.5854 | 10,106,852 |
 | Basic single-PT GPU | 4.53492 | 2.44432 | 20.2038 | 10,106,852 |
 | Single-PT GPU with timing | 4.50967 | 2.20927 | 20.4308 | 10,106,852 |
+| Dynamic, threshold 4,096 | 3.88630 | 2.25263 | 20.9004 | 10,106,852 |
+| Dynamic, threshold 16,384 | 3.58070 | 2.14956 | 19.5771 | 10,106,852 |
+| Dynamic, threshold 65,536 | 3.61386 | 2.19052 | 19.1147 | 10,106,852 |
 
 ## Stage 1 Analysis
 
@@ -51,3 +54,17 @@ The kernel itself is fast, but repeated device allocation dominates the measured
 GPU path. Allocation accounts for about 65% of `GenerateGPU` time, while kernel
 execution accounts for less than 1%. This result motivates both threshold-based
 scheduling and batching or buffer reuse.
+
+## Stage 3 Dynamic Scheduling
+
+| Threshold | CPU calls | GPU calls | CPU guesses | GPU guesses | CPU time (s) | GPU time (s) | Guess time (s) |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 4,096 | 331 | 185 | 131,159 | 9,975,693 | 0.014617 | 3.607982 | 3.88630 |
+| 16,384 | 401 | 115 | 809,526 | 9,297,326 | 0.017306 | 3.375401 | 3.58070 |
+| 65,536 | 445 | 71 | 2,174,327 | 7,932,525 | 0.030897 | 3.350501 | 3.61386 |
+
+The 16,384 threshold is the best of the tested values and is the default.
+Compared with the basic GPU version, it reduces guess-generation time by about
+21%. Raising the threshold to 65,536 reduces GPU calls further but moves enough
+work back to the CPU to slightly worsen the end-to-end result. All three runs
+produce the same final guess count and progress sequence as the serial baseline.
