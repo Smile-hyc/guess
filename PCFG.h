@@ -13,6 +13,14 @@ using namespace std;
 #define GPU_THRESHOLD 16384
 #endif
 
+#ifndef ENABLE_MULTI_PT
+#define ENABLE_MULTI_PT 0
+#endif
+
+#ifndef MULTI_PT_BATCH_SIZE
+#define MULTI_PT_BATCH_SIZE 4
+#endif
+
 class segment
 {
 public:
@@ -161,8 +169,10 @@ public:
     // 对优先队列的一个PT，生成所有guesses
     void Generate(PT pt);
     void GenerateGPU(PT pt);
+    void GenerateMultiPTGPU(const vector<PT> &pts);
     void PrintGPUTimingSummary() const;
     void PrintDynamicSchedulingSummary() const;
+    void PrintMultiPTSummary() const;
 
     // 将优先队列最前面的一个PT
     void PopNext();
@@ -183,4 +193,8 @@ public:
     uint64_t cpu_calls = 0;
     uint64_t cpu_generated_guesses = 0;
     double cpu_generate_time = 0.0;
+
+    uint64_t multi_pt_batches = 0;
+    uint64_t multi_pt_count = 0;
+    uint64_t multi_pt_generated_guesses = 0;
 };

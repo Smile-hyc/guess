@@ -97,6 +97,50 @@ void PriorityQueue::PopNext()
 #ifdef USE_CPU_GENERATION
     Generate(priority.front());
 #else
+#if ENABLE_MULTI_PT
+    if (priority.front().max_indices.back() >= GPU_THRESHOLD)
+    {
+        vector<PT> batch;
+        for (size_t i = 0;
+             i < priority.size() && batch.size() < MULTI_PT_BATCH_SIZE;
+             ++i)
+        {
+            if (priority[i].max_indices.back() < GPU_THRESHOLD)
+            {
+                break;
+            }
+            batch.emplace_back(priority[i]);
+        }
+
+        if (batch.size() > 1)
+        {
+            GenerateMultiPTGPU(batch);
+
+            vector<PT> new_pts;
+            for (PT &source : batch)
+            {
+                vector<PT> source_new_pts = source.NewPTs();
+                for (PT &pt : source_new_pts)
+                {
+                    CalProb(pt);
+                    new_pts.emplace_back(pt);
+                }
+            }
+
+            priority.erase(priority.begin(), priority.begin() + batch.size());
+            for (const PT &pt : new_pts)
+            {
+                auto position = priority.begin();
+                while (position != priority.end() && position->prob >= pt.prob)
+                {
+                    ++position;
+                }
+                priority.emplace(position, pt);
+            }
+            return;
+        }
+    }
+#endif
     const int candidate_count = priority.front().max_indices.back();
     if (candidate_count < GPU_THRESHOLD)
     {
