@@ -4,3 +4,5 @@ test.e
 files/
 *.log
 *.o
+*.exe
+Rockyou-singleLined-full.txt
