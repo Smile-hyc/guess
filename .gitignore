@@ -4,3 +4,4 @@ test.e
 files/
 *.log
 *.o
+correctness_guess_general
